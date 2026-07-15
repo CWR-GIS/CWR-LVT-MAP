@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Liquor · Vape · Smoke — Warner Robins</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --bg:#f5f5f7; --card:#fff; --glass:rgba(255,255,255,.74);
+  --stroke:rgba(0,0,0,.08); --text:#1d1d1f; --sub:#6e6e73;
+  --blue:#0A84FF; --red:#FF375F; --orange:#FF9F0A; --r:18px;
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--text)}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+h1{font-size:30px;font-weight:800;letter-spacing:-.03em}
+.sub{color:var(--sub);font-size:14px;margin-top:4px}
+.sec{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--sub);margin:34px 0 12px}
+
+/* KPI strip */
+#kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:20px}
+.kpi{background:var(--card);border:1px solid var(--stroke);border-radius:var(--r);
+  padding:16px 18px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.kpi b{font-size:28px;font-weight:800;letter-spacing:-.02em;display:block;
+  font-variant-numeric:tabular-nums}
+.kpi span{font-size:11.5px;color:var(--sub)}
+.kpi.alert b{color:var(--red)}
+.kpi.warn b{color:var(--orange)}
+
+/* type bar */
+#typeBar{display:flex;height:12px;border-radius:8px;overflow:hidden;margin:14px 0 6px}
+#typeLbls{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--sub)}
+#typeLbls .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+
+/* map */
+#mapCard{position:relative;border-radius:var(--r);overflow:hidden;
+  border:1px solid var(--stroke);box-shadow:0 4px 18px rgba(0,0,0,.08)}
+#map{height:62vh;min-height:420px}
+#chips{position:absolute;top:12px;left:12px;z-index:1000;display:flex;flex-wrap:wrap;gap:6px;max-width:70%}
+.chip{padding:5px 12px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;
+  cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;
+  border:1px solid rgba(0,0,0,.06);box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:#fff}
+.chip.off{background:var(--glass)!important;color:var(--sub);
+  backdrop-filter:blur(12px)}
+#ringBtns{position:absolute;top:12px;right:12px;z-index:1000;display:flex;gap:6px}
+.ringToggle{
+  background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--stroke);
+  border-radius:999px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer;color:var(--sub)}
+.ringToggle[data-ring="current"].on{color:#fff;background:var(--red)}
+.ringToggle[data-ring="proposed"].on{color:#fff;background:var(--orange)}
+/* google-maps-style store labels */
+.storeLbl{background:none;border:none;box-shadow:none;pointer-events:none}
+.storeLbl div{
+  font-size:11px;font-weight:600;color:#3c4043;white-space:nowrap;
+  text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,
+              0 2px 3px rgba(255,255,255,.9);
+  transform:translateY(2px)}
+
+/* pairs table + store table */
+.card{background:var(--card);border:1px solid var(--stroke);border-radius:var(--r);
+  padding:6px 0;box-shadow:0 2px 10px rgba(0,0,0,.05);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);
+  text-align:left;padding:10px 14px;border-bottom:1px solid var(--stroke);cursor:pointer;
+  user-select:none;white-space:nowrap}
+td{padding:9px 14px;border-bottom:1px solid rgba(0,0,0,.04);vertical-align:top}
+tr:hover td{background:rgba(120,120,128,.06);cursor:pointer}
+.tag{font-size:10px;font-weight:700;color:#fff;border-radius:6px;padding:2px 7px;white-space:nowrap}
+.tag.r{background:var(--red)} .tag.o{background:var(--orange)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+#search{width:100%;max-width:340px;padding:9px 14px;border:none;border-radius:12px;
+  font-size:14px;background:rgba(120,120,128,.12);outline:none;margin-bottom:12px}
+#search:focus{box-shadow:0 0 0 2px var(--blue)}
+.note{font-size:11.5px;color:var(--sub);margin-top:8px;line-height:1.5}
+.num{font-variant-numeric:tabular-nums;text-align:right}
+@media(max-width:700px){
+  h1{font-size:23px}
+  .hideM{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Liquor · Vape · Smoke Retailers</h1>
+  <div class="sub">City of Warner Robins — commercial license locations &amp; separation analysis</div>
+
+  <div id="kpis"></div>
+  <div id="typeBar"></div>
+  <div id="typeLbls"></div>
+
+  <div class="sec">Map</div>
+  <div id="mapCard">
+    <div id="chips"></div>
+    <div id="ringBtns">
+      <div class="ringToggle" data-ring="current"></div>
+      <div class="ringToggle" data-ring="proposed"></div>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <div class="sec">Separation conflicts — current standard (<span id="c1"></span> ft)</div>
+  <div class="card"><table id="pairTbl">
+    <thead><tr><th>Store A</th><th>Store B</th><th class="num">Edge-to-edge (ft)</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <div class="note" id="pairNote"></div>
+
+  <div class="sec">All stores</div>
+  <input id="search" type="text" placeholder="Search name, address, account, parcel…">
+  <div class="card"><table id="storeTbl">
+    <thead><tr>
+      <th data-k="store">Store</th><th data-k="type">Type</th>
+      <th data-k="addr">Address</th><th data-k="account" class="hideM">Account</th>
+      <th data-k="parcel" class="hideM">Parcel / Owner</th>
+      <th data-k="nn_ft" class="num">Nearest (ft)</th><th>Status</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <div class="note">
+    Distances are polygon edge-to-edge (always &le; door-to-door), so flags are conservative —
+    a flagged pair may still pass a front-door measurement. Current 300 ft standard per city
+    attorney (verify against ordinance text); 2,000 ft is the proposed amendment, still in
+    draft under the license moratorium. Parcel owner shown for context only; multiple
+    businesses may share one parcel.
+  </div>
+</div>
+
+<script>
+const DATA={"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"oid": 1, "store": "AREA 478", "biz": "AREA 478 LLC", "account": "17382", "addr": "1806 RUSSELL PKWY STE 300", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 2274, "nn_name": "ROBINS VAPE AND SMOKE", "fail300": false, "fail2000": false, "parcel": "0W0790 074000", "owner": "SAHAYOGI LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.66614072047854, 32.59368012885142, null], [-83.66614072080162, 32.59360456697441, null], [-83.66638257828434, 32.59360456710648, null], [-83.66638257816425, 32.59368012898547, null], [-83.66614072047854, 32.59368012885142, null]]]}}, {"type": "Feature", "properties": {"oid": 2, "store": "EXPRESS HIGHWAY STORE", "biz": "EXPRESS HIGHWAY STORE", "account": "17359", "addr": "1505 ELBERTA RD STE A", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "LIQUOR", "nn_ft": 568, "nn_name": "J & J SMOKE SHOP", "fail300": false, "fail2000": true, "parcel": "0W0710 015000", "owner": "AHN JAY K"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.64240024629242, 32.63118615556826, null], [-83.64247939355242, 32.63119534532989, null], [-83.64245877482911, 32.63132768836599, null], [-83.64238138615072, 32.63131937166608, null], [-83.64240024629242, 32.63118615556826, null]]]}}, {"type": "Feature", "properties": {"oid": 3, "store": "WARTOWN LIQUOR", "biz": "WARTOWN LIQUOR", "account": "17256", "addr": "2211 MOODY DR", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "LIQUOR", "nn_ft": 814, "nn_name": "ELECTRIC CLOUDZ", "fail300": false, "fail2000": true, "parcel": "0W0870 041000", "owner": "2209 MOODY LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.62396433416326, 32.59210618468154, null], [-83.62396433386024, 32.59222465534017, null], [-83.6235155310233, 32.5922218574752, null], [-83.62351356561082, 32.59205797133403, null], [-83.6239643341317, 32.59205864491288, null], [-83.62396433416326, 32.59210618468154, null]]]}}, {"type": "Feature", "properties": {"oid": 4, "store": "HABITS SMOKE & VAPE", "biz": "HABITS SMOKE & VAPE", "account": "17256", "addr": "608 S HOUSTON LAKE RD STE 400", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 893, "nn_name": "ROBINS PACKAGE", "fail300": false, "fail2000": true, "parcel": "0W64A0 157000", "owner": "A&H HOLDINGS LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.67245589003562, 32.60134232867797, null], [-83.6724558904043, 32.60139445874856, null], [-83.67223045390121, 32.60139445906661, null], [-83.67223045472845, 32.60134232900144, null], [-83.67245589003562, 32.60134232867797, null]]]}}, {"type": "Feature", "properties": {"oid": 5, "store": "MISSION LIQUOR", "biz": "MISSION LIQUOR", "account": "11717", "addr": "1051 HWY 96", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "LIQUOR", "nn_ft": 1515, "nn_name": "THE VAPOR SHOP", "fail300": false, "fail2000": true, "parcel": "0W1030 059000", "owner": "KALP JAY INC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.68894302729362, 32.55366092671154, null], [-83.68883821490259, 32.55357116721128, null], [-83.68871305807873, 32.55346398470701, null], [-83.6888399898971, 32.55335896344874, null], [-83.68907004845677, 32.55355492167987, null], [-83.68901799807782, 32.553598359327815, null], [-83.68894302729362, 32.55366092671154, null]]]}}, {"type": "Feature", "properties": {"oid": 6, "store": "JUS ONE MORE SMOKE SHOP", "biz": "JUS ONE MORE SMOKE SHOP", "account": "10326", "addr": "1238 Houston Lake Rd", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 23, "nn_name": "TOP SHELF LIQUOR", "fail300": true, "fail2000": true, "parcel": "0W1010 034000", "owner": "GANESHA GANAPATI LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.66116799153987, 32.56734871720624, null], [-83.66116799194207, 32.56726129797695, null], [-83.66139301953316, 32.567262742038224, null], [-83.66139301935935, 32.56735015946607, null], [-83.66116799153987, 32.56734871720624, null]]]}}, {"type": "Feature", "properties": {"oid": 7, "store": "TOP SHELF LIQUOR", "biz": "TOP SHELF LIQUOR", "account": "15789", "addr": "1240 HOUSTON LAKE RD STE 100-200", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "LIQUOR", "nn_ft": 23, "nn_name": "JUS ONE MORE SMOKE SHOP", "fail300": true, "fail2000": true, "parcel": "0W1010 021000", "owner": "LEE TERRY C"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.66139400754952, 32.56719801193108, null], [-83.66116799137608, 32.567197027429636, null], [-83.66116993137031, 32.56692024027188, null], [-83.6613963276172, 32.566921692531935, null], [-83.66139400754952, 32.56719801193108, null]]]}}, {"type": "Feature", "properties": {"oid": 8, "store": "LOLO LIQUOR", "biz": "LOLO LIQUOR", "account": "11392", "addr": "506 HOUSTON RD", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "LIQUOR", "nn_ft": 1705, "nn_name": "J & J SMOKE SHOP", "fail300": false, "fail2000": true, "parcel": "0W047J 011000", "owner": "SJ & SW ENTERPRISES LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.6412820114121, 32.6251739352644, null], [-83.64113335194, 32.62517393547146, null], [-83.64103802871938, 32.625173935114056, null], [-83.6410380291606, 32.62499992273536, null], [-83.64128201138118, 32.62499992288088, null], [-83.64128201137278, 32.62502108374644, null], [-83.6412820114121, 32.6251739352644, null]]]}}, {"type": "Feature", "properties": {"oid": 9, "store": "BOOTLEGGERS", "biz": "BOOTLEGGERS", "account": "11424", "addr": "2611 MOODY RD STE A", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "LIQUOR", "nn_ft": 6692, "nn_name": "WARTOWN LIQUOR", "fail300": false, "fail2000": false, "parcel": "0W80B0 005000", "owner": "PATEL CHANDRAKANT"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.62436102787956, 32.57385270516256, null], [-83.62426102814997, 32.573852704696904, null], [-83.6242610274709, 32.57365270629945, null], [-83.62441192989735, 32.57365270635222, null], [-83.62446102755774, 32.573652706249305, null], [-83.62446102761028, 32.57385270554866, null], [-83.62441521658864, 32.573852705402146, null], [-83.62437857139368, 32.573852705108195, null], [-83.62436102787956, 32.57385270516256, null]]]}}, {"type": "Feature", "properties": {"oid": 10, "store": "LIQUORS", "biz": "LIQUORS", "account": "17125", "addr": "1020 CARL VINSON PKWY STE 200", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "LIQUOR", "nn_ft": 7008, "nn_name": "EXPRESS HIGHWAY STORE", "fail300": false, "fail2000": false, "parcel": "0W0720 118000", "owner": "CARL VINSON 1020 LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.66006563672444, 32.64356850784646, null], [-83.65998557244711, 32.64356619174863, null], [-83.65990550817968, 32.643563874697975, null], [-83.65990806580326, 32.64346567135704, null], [-83.66007304733715, 32.64346931947488, null], [-83.66007098483709, 32.64349692980046, null], [-83.66006563672444, 32.64356850784646, null]]]}}, {"type": "Feature", "properties": {"oid": 11, "store": "BENNETTS LIQUORS", "biz": "RUSHI RAJ INC", "account": "11427", "addr": "800 RUSSELL PKWY", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "LIQUOR", "nn_ft": 2949, "nn_name": "SMOKE SHOP", "fail300": false, "fail2000": false, "parcel": "0W054B 48A000", "owner": "RUSHI RAJ INC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.63741096550271, 32.59431580145811, null], [-83.63741096578062, 32.59438498288207, null], [-83.63741096583011, 32.594409983750026, null], [-83.63707598390866, 32.594409984432616, null], [-83.63707598432575, 32.59425596798065, null], [-83.63741096566885, 32.594255968193906, null], [-83.63741096550271, 32.59431580145811, null]]]}}, {"type": "Feature", "properties": {"oid": 12, "store": "THE VAPOR SHOP", "biz": "THE VAPOR SHOPPE INC", "account": "11617", "addr": "1117 HWY 96 STE 104", "city": "WARNER ROBINS", "state": "GA", "zip": "31047", "type": "VAPE", "nn_ft": 1421, "nn_name": "SOUTHERN SIPS LIQUOR", "fail300": false, "fail2000": true, "parcel": "0W1030 053000", "owner": "SPP INVESTMENTS LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.6938371823633, 32.55213784572573, null], [-83.69392409699446, 32.552136140765576, null], [-83.69392520958698, 32.55221680633902, null], [-83.69372754856681, 32.55222068207534, null], [-83.6937262796051, 32.55214002042206, null], [-83.69378647887874, 32.552138840020234, null], [-83.6938371823633, 32.55213784572573, null]]]}}, {"type": "Feature", "properties": {"oid": 13, "store": "ROCKY SMOKE SHOP", "biz": "ROCKY SMOKE SHOP", "account": "11774", "addr": "115 RUSSELL PKWY STE T", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 40, "nn_name": "ELECTRIC CLOUDZ", "fail300": true, "fail2000": true, "parcel": "0W0870 003000", "owner": "SUSO 4 ROXBOROUGH LP"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.62685563152623, 32.592447380981284, null], [-83.62685563271003, 32.59247845733235, null], [-83.62685563250632, 32.5925069220378, null], [-83.62679238157926, 32.5925053958561, null], [-83.62679139953187, 32.5922998079893, null], [-83.62685563197114, 32.59229804498016, null], [-83.62685563277783, 32.592413766047514, null], [-83.62685563152623, 32.592447380981284, null]]]}}, {"type": "Feature", "properties": {"oid": 14, "store": "ELECTRIC CLOUDZ", "biz": "ELECTRIC CLOUDZ", "account": "11662", "addr": "115 RUSSELL PKWY STE Q", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 40, "nn_name": "ROCKY SMOKE SHOP", "fail300": true, "fail2000": true, "parcel": "0W0870 003000", "owner": "SUSO 4 ROXBOROUGH LP"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.62666053774024, 32.592423597002394, null], [-83.62666032222263, 32.592477651422435, null], [-83.6266036835835, 32.59247716990373, null], [-83.62660521792061, 32.59229914673298, null], [-83.62666102934975, 32.59229988080886, null], [-83.62666089564404, 32.59233354387117, null], [-83.62666053774024, 32.592423597002394, null]]]}}, {"type": "Feature", "properties": {"oid": 15, "store": "HP LIQUORS", "biz": "SHREE UMIYA 15 INC", "account": "11735", "addr": "4002 RUSSELL PKWY", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "LIQUOR", "nn_ft": 4550, "nn_name": "FREE SMOKE", "fail300": false, "fail2000": false, "parcel": "0W1200 111000", "owner": "JAY AMBE 15 LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.70148095722841, 32.58211895939955, null], [-83.70147982384958, 32.58219446057152, null], [-83.70145099187205, 32.58219350162306, null], [-83.70140290809631, 32.5821925805112, null], [-83.70118804668522, 32.58219062869736, null], [-83.70118890319928, 32.58204363331183, null], [-83.70148209060919, 32.58204345732485, null], [-83.70148170734676, 32.58206899621074, null], [-83.70148095722841, 32.58211895939955, null]]]}}, {"type": "Feature", "properties": {"oid": 16, "store": "CLASSIC BOTTLE SHOPPE", "biz": "VISHWAS LLC", "account": "12096", "addr": "4993 RUSSELL PKWY STE 130", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "LIQUOR", "nn_ft": 204, "nn_name": "BLAZE", "fail300": true, "fail2000": true, "parcel": "0W1200 085000", "owner": "MCNEAL CONSTRUCTION CO"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.71804673842453, 32.579231073071995, null], [-83.71804726787877, 32.57930356476393, null], [-83.71780830920642, 32.57930672008024, null], [-83.71780775013602, 32.5792310187182, null], [-83.71804673842453, 32.579231073071995, null]]]}}, {"type": "Feature", "properties": {"oid": 17, "store": "GALAXY SPIRITS", "biz": "JAINEEL LLC", "account": "13035", "addr": "715 HWY 96 STE B", "city": "BONAIRE", "state": "GA", "zip": "31005", "type": "LIQUOR", "nn_ft": 2577, "nn_name": "SMOKE SHOP", "fail300": false, "fail2000": false, "parcel": "0W0980 146000", "owner": "GAJANAN LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.65582962064366, 32.55514432870589, null], [-83.65583294949865, 32.555262149201866, null], [-83.6556024609736, 32.55526666663344, null], [-83.65559378984854, 32.55507506486028, null], [-83.65582758862917, 32.55507239428479, null], [-83.65582962064366, 32.55514432870589, null]]]}}, {"type": "Feature", "properties": {"oid": 18, "store": "ALL AMERICAN LIQUORS", "biz": "INDO USA LLC", "account": "13046", "addr": "2214 WATSON BLVD", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "LIQUOR", "nn_ft": 1092, "nn_name": "SMOKEY VAPE PLUS", "fail300": false, "fail2000": true, "parcel": "0W068F 001000", "owner": "INDO USA LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.6595610200554, 32.61864842551726, null], [-83.65956102056091, 32.618730936394336, null], [-83.6592790392667, 32.61873093649211, null], [-83.65927903983238, 32.61856591564808, null], [-83.65956102060929, 32.61856591554517, null], [-83.6595610200554, 32.61864842551726, null]]]}}, {"type": "Feature", "properties": {"oid": 19, "store": "ROBINS PACKAGE", "biz": "HARI VADAN INC", "account": "14000", "addr": "628 HOUSTON LAKE RD STE A", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "LIQUOR", "nn_ft": 0, "nn_name": "ROBINS VAPE AND SMOKE", "fail300": true, "fail2000": true, "parcel": "0W0790 112000", "owner": "SHASTRIJI YOGIJI LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.67114337552331, 32.599064120888464, null], [-83.67100325467128, 32.59911662978894, null], [-83.67084471661589, 32.59881348269337, null], [-83.67098081407322, 32.59877282231592, null], [-83.67099117101709, 32.59877308412304, null], [-83.67109501897836, 32.598971655948986, null], [-83.67114337552331, 32.599064120888464, null]]]}}, {"type": "Feature", "properties": {"oid": 20, "store": "ROBINS VAPE AND SMOKE", "biz": "SAHAJANAND 628 LLC", "account": "15224", "addr": "628 HOUSTON LAKE RD STE B", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 0, "nn_name": "ROBINS PACKAGE", "fail300": true, "fail2000": true, "parcel": "0W0790 112000", "owner": "SHASTRIJI YOGIJI LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.67100348237767, 32.59862754703503, null], [-83.67099828868831, 32.59877326370961, null], [-83.67099117102207, 32.59877308322124, null], [-83.67098081514352, 32.598772821418336, null], [-83.67089173350261, 32.59877056889304, null], [-83.67089692629885, 32.59862485222029, null], [-83.67100348237767, 32.59862754703503, null]]]}}, {"type": "Feature", "properties": {"oid": 21, "store": "SMOKE SHOP", "biz": "MAHANT 007 LLC", "account": "14282", "addr": "810 HWY 96 STE 900", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 2577, "nn_name": "GALAXY SPIRITS", "fail300": false, "fail2000": false, "parcel": "0W1010 036000", "owner": "DEETYA GROUP LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.66424861494004, 32.5535926226585, null], [-83.66420396177887, 32.55363355173147, null], [-83.66397685630733, 32.553484500590905, null], [-83.66397696760782, 32.55342308278651, null], [-83.66405958711675, 32.55342142189233, null], [-83.66424861494004, 32.5535926226585, null]]]}}, {"type": "Feature", "properties": {"oid": 22, "store": "SMOKE SHOP N MORE", "biz": "SHS LLC /", "account": "14416", "addr": "206 RUSSELL PKWY STE 500", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 655, "nn_name": "ELECTRIC CLOUDZ", "fail300": false, "fail2000": true, "parcel": "0W0330 113000", "owner": "MCNEAL CONSTRUCTION CO"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.62589529612939, 32.59421724772848, null], [-83.62589529599923, 32.59419953259352, null], [-83.62598960304855, 32.59419953265365, null], [-83.62598960294146, 32.594371981964514, null], [-83.6258952957115, 32.59437198190248, null], [-83.62589529623446, 32.59427522953301, null], [-83.62589529612939, 32.59421724772848, null]]]}}, {"type": "Feature", "properties": {"oid": 23, "store": "ROCKY MOUNTAIN LIQUOR", "biz": "PINKY TUSHAR TAILOR", "account": "14581", "addr": "1500 WATSON BLVD STE A", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "LIQUOR", "nn_ft": 3357, "nn_name": "MANOR MARKET PLACE", "fail300": false, "fail2000": false, "parcel": "0W038K 018000", "owner": "PATEL ASHVIN P"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.62590049305969, 32.61846601143519, null], [-83.6260090094622, 32.61846601149848, null], [-83.62600900952114, 32.618818979051454, null], [-83.62590049268735, 32.61881897988541, null], [-83.62590049305969, 32.61846601143519, null]]]}}, {"type": "Feature", "properties": {"oid": 24, "store": "WAR-TOWN", "biz": "KESHAV JIVANDAS 1933 INC", "account": "14681", "addr": "3010 WATSON BLVD STE 1-2", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "VAPE", "nn_ft": 612, "nn_name": "420 CAVE", "fail300": false, "fail2000": true, "parcel": "0W78D0 292000", "owner": "WR PARTNERS LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.69215679542204, 32.617787466247904, null], [-83.69197736596348, 32.6178267239403, null], [-83.69193276631475, 32.61767992926416, null], [-83.69211101824067, 32.617636795715676, null], [-83.69215679542204, 32.617787466247904, null]]]}}, {"type": "Feature", "properties": {"oid": 25, "store": "TOBACCO & VAPE LAND 3", "biz": "JIHAD ALZOKARI", "account": "14720", "addr": "2724 WATSON BLVD STE I", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "VAPE", "nn_ft": 1087, "nn_name": "XHALE CITY", "fail300": false, "fail2000": true, "parcel": "0W0960 007000", "owner": "INTEGRIS VENTURES-SPVWR LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.67464439158707, 32.62054370500275, null], [-83.67464493231, 32.620481089174625, null], [-83.67484248485967, 32.62048228592778, null], [-83.67484287293135, 32.6205412999661, null], [-83.67464439158707, 32.62054370500275, null]]]}}, {"type": "Feature", "properties": {"oid": 26, "store": "478 VAPE & SMOKE", "biz": "KESHAV DAS 2801 LLC", "account": "15081", "addr": "494 BOOTH RD STE E", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 2761, "nn_name": "WARTOWN LIQUOR", "fail300": false, "fail2000": false, "parcel": "0W0750 078000", "owner": "ROBINS JO LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.61428213846747, 32.59210073499099, null], [-83.61428293923325, 32.59199416548968, null], [-83.61454834855766, 32.59199559448197, null], [-83.61454754810596, 32.59210216398832, null], [-83.61428213846747, 32.59210073499099, null]]]}}, {"type": "Feature", "properties": {"oid": 27, "store": "BLAZE", "biz": "HP VENTURES LLC", "account": "15193", "addr": "4993 RUSSELL PKWY STE 630", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 204, "nn_name": "CLASSIC BOTTLE SHOPPE", "fail300": true, "fail2000": true, "parcel": "0W1200 085000", "owner": "MCNEAL CONSTRUCTION CO"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.71838696425026, 32.578748440094934, null], [-83.71838696447567, 32.57867368853038, null], [-83.71852155149904, 32.578672133136074, null], [-83.7185227602174, 32.57874711356458, null], [-83.71838696425026, 32.578748440094934, null]]]}}, {"type": "Feature", "properties": {"oid": 28, "store": "SMOKE SHOP", "biz": "AKSHARAM007 LLC", "account": "15194", "addr": "2991 HWY 41 N STE B", "city": "FORT VALLEY", "state": "GA", "zip": "31030", "type": "VAPE", "nn_ft": 630, "nn_name": "BLAZE", "fail300": false, "fail2000": true, "parcel": "060 032 B", "owner": "DHRUVI 0917 LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.72057325673522, 32.57882325080542, null], [-83.72057162183707, 32.57876623666891, null], [-83.72056780170112, 32.578632999551466, null], [-83.72075926683945, 32.578629064451135, null], [-83.7207616883656, 32.57871353177278, null], [-83.72076472121275, 32.57881931569666, null], [-83.72057325673522, 32.57882325080542, null]]]}}, {"type": "Feature", "properties": {"oid": 29, "store": "BREATHE FIRE", "biz": "PRAPTI", "account": "15239", "addr": "2032 WATSON BLVD", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "VAPE", "nn_ft": 1238, "nn_name": "CLOUD 9 SMOKE", "fail300": false, "fail2000": true, "parcel": "0W069A 041000", "owner": "CAUSEY H EDWARD III"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.65075091251256, 32.61875168427969, null], [-83.6508403868614, 32.6187514169273, null], [-83.65084119456725, 32.61894541514923, null], [-83.65075172003058, 32.61894568159846, null], [-83.65075091251256, 32.61875168427969, null]]]}}, {"type": "Feature", "properties": {"oid": 30, "store": "SMOKE SHOP", "biz": "ASKHARAM007 LLC", "account": "15245", "addr": "1204 RUSSELL PKWY STE 100", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 2949, "nn_name": "BENNETTS LIQUORS", "fail300": false, "fail2000": false, "parcel": "0W055A 021000", "owner": "GIBSON PROPERTIES OF MIDDLE GA LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.64698771138902, 32.59428359826585, null], [-83.64717206156851, 32.59428359771639, null], [-83.64717206172959, 32.594363884978534, null], [-83.64698771139088, 32.59436388462449, null], [-83.64698771138902, 32.59428359826585, null]]]}}, {"type": "Feature", "properties": {"oid": 31, "store": "FAMOUS LIQUOR", "biz": "LAKSHYARAJ INC", "account": "15288", "addr": "545 N DAVIS DR STE B", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "LIQUOR", "nn_ft": 595, "nn_name": "MINI VAPE STORE", "fail300": false, "fail2000": true, "parcel": "0W022A 15A000", "owner": "CHAVDA BHUPATSINH"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.61347206349198, 32.634267220463116, null], [-83.61347331662246, 32.634143420233755, null], [-83.61367104087623, 32.63414020424641, null], [-83.6136722988797, 32.6342170649988, null], [-83.61367400491224, 32.634321234301055, null], [-83.6135860604041, 32.63432221768194, null], [-83.61358507142528, 32.634291201241986, null], [-83.61347206393984, 32.634292260812906, null], [-83.61347206349198, 32.634267220463116, null]]]}}, {"type": "Feature", "properties": {"oid": 32, "store": "HOME OCC APPD 2/7/22", "biz": "RJS SLOW BURN CIGARS & EXCLUSIVE", "account": "15319", "addr": "417 DOROTHY CT", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 2564, "nn_name": "FREE SMOKE", "fail300": false, "fail2000": false, "parcel": "0W1000 216000", "owner": "WRIGHT KATRINA S"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.68591093619177, 32.56727798344928, null], [-83.68583448833711, 32.56727609842288, null], [-83.68583482871817, 32.5672661941745, null], [-83.6858078957996, 32.56726552931152, null], [-83.68580672619657, 32.567299512490465, null], [-83.68575177526614, 32.56729815695139, null], [-83.68575638105516, 32.567164272885734, null], [-83.68579792136275, 32.5671652975555, null], [-83.6857971082387, 32.567188954498064, null], [-83.68587619787702, 32.56719090466257, null], [-83.68587656345346, 32.567180269137225, null], [-83.68591426503791, 32.567181198823604, null], [-83.68591093619177, 32.56727798344928, null]]]}}, {"type": "Feature", "properties": {"oid": 33, "store": "DAVIS LIQUOR", "biz": "ABC DAVIS LLC", "account": "15401", "addr": "514 N DAVIS DR", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "LIQUOR", "nn_ft": 361, "nn_name": "GHOST SMOKE SHOP", "fail300": false, "fail2000": true, "parcel": "0W016E 040000", "owner": "PATEL HASMUKHBHAI C"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.61252582781101, 32.63039400079178, null], [-83.61269671585946, 32.63039400091433, null], [-83.61269671673175, 32.63053171614316, null], [-83.61236672271878, 32.63053171627049, null], [-83.61236672235191, 32.63039400104713, null], [-83.61252582781101, 32.63039400079178, null]]]}}, {"type": "Feature", "properties": {"oid": 34, "store": "FREE SMOKE", "biz": "SNS DAS LLC", "account": "15408", "addr": "915 LAKE JOY RD STE C", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 2564, "nn_name": "HOME OCC APPD 2/7/22", "fail300": false, "fail2000": false, "parcel": "0W1200 077000", "owner": "MAP INVESTMENTS LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.69201825169941, 32.57219949512277, null], [-83.69194504159753, 32.57220729258328, null], [-83.69194013664423, 32.572135206336185, null], [-83.69208210580496, 32.57212145682037, null], [-83.69209146178918, 32.57219169761946, null], [-83.69205493080945, 32.572195588088896, null], [-83.69201825169941, 32.57219949512277, null]]]}}, {"type": "Feature", "properties": {"oid": 35, "store": "FRIENDS & FAMILY LIQUOR", "biz": "ABC 22 LLC", "account": "15678", "addr": "6001 WATSON BLVD STE 400-500", "city": "BYRON", "state": "GA", "zip": "31008", "type": "LIQUOR", "nn_ft": 1513, "nn_name": "FOOD MART?", "fail300": false, "fail2000": true, "parcel": "0W78L0 048000", "owner": "DHANRAJ INC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.71184394085387, 32.613902459271486, null], [-83.71202524539451, 32.613833456175975, null], [-83.71210851633835, 32.61397648450045, null], [-83.71192684290172, 32.614044854208295, null], [-83.71184394085387, 32.613902459271486, null]]]}}, {"type": "Feature", "properties": {"oid": 36, "store": "SMOKERZ WORLD", "biz": "AMYRA 9 LLC", "account": "15679", "addr": "700 FEAGIN MILL RD STE 400", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 2321, "nn_name": "HOME OCC APPROVED 3/18/24", "fail300": false, "fail2000": false, "parcel": "0W1010 026000", "owner": "D & D MIDDLE GA LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.65313612788215, 32.571561012851134, null], [-83.65302802098385, 32.57156930606851, null], [-83.65301054714516, 32.57140599373075, null], [-83.65311728606274, 32.571397191725396, null], [-83.65313612788215, 32.571561012851134, null]]]}}, {"type": "Feature", "properties": {"oid": 37, "store": "J & J SMOKE SHOP", "biz": "JAMES CLARK", "account": "15731", "addr": "748 N HOUSTON RD STE F", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "VAPE", "nn_ft": 568, "nn_name": "EXPRESS HIGHWAY STORE", "fail300": false, "fail2000": true, "parcel": "0W046A 025000", "owner": "TREBES STEPHANIE"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.64134011498315, 32.62990972116985, null], [-83.64117435539049, 32.62991342749718, null], [-83.64117435512222, 32.62986041039314, null], [-83.64134011534209, 32.629860410485506, null], [-83.64134011498315, 32.62990972116985, null]]]}}, {"type": "Feature", "properties": {"oid": 38, "store": "GHOST SMOKE SHOP", "biz": "AMANSTAH LLC", "account": "16166", "addr": "501 N DAVIS DR STE C", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 361, "nn_name": "DAVIS LIQUOR", "fail300": false, "fail2000": true, "parcel": "0W023G 008000", "owner": "CASCADE PROPERTIES LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.61352216506134, 32.62968762148606, null], [-83.6135221659948, 32.6296330750289, null], [-83.61366798390979, 32.62963307520463, null], [-83.61366798413049, 32.6296876216674, null], [-83.61352216506134, 32.62968762148606, null]]]}}, {"type": "Feature", "properties": {"oid": 39, "store": "HOME OCC APPROVED 3/18/24", "biz": "THE ASHTRAY LLC", "account": "16525", "addr": "207 WILLIS CREEK RD", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 2321, "nn_name": "SMOKERZ WORLD", "fail300": false, "fail2000": false, "parcel": "0W0940 180000", "owner": "SWEARINGANE SELENA D"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.65619172143128, 32.57739239529691, null], [-83.65623232304723, 32.577391419415676, null], [-83.65623276212001, 32.57740453446427, null], [-83.65631657413282, 32.57740252020931, null], [-83.65632131112685, 32.57754382741573, null], [-83.6562754322379, 32.57754492979058, null], [-83.65627597345565, 32.57756107264034, null], [-83.6562380401936, 32.57756198452233, null], [-83.65623195492702, 32.57748666291771, null], [-83.65619355015707, 32.57748639420162, null], [-83.65619172143128, 32.57739239529691, null]]]}}, {"type": "Feature", "properties": {"oid": 40, "store": "HARRYS LIQUOR WR", "biz": "RELIANCE LIQUOR II LLC", "account": "17047", "addr": "100 VIETNAM VETERANS MEMORIAL PKWY", "city": "WARNER ROBINS", "state": "GA", "zip": "31030", "type": "LIQUOR", "nn_ft": 6140, "nn_name": "SMOKE SHOP", "fail300": false, "fail2000": false, "parcel": "051 048", "owner": ""}, "geometry": {"type": "Polygon", "coordinates": [[[-83.73819622888061, 32.58708431592136, null], [-83.73788814426483, 32.58701720066217, null], [-83.73797005820998, 32.58676833627077, null], [-83.73830210600369, 32.58684667135404, null], [-83.73819622888061, 32.58708431592136, null]]]}}, {"type": "Feature", "properties": {"oid": 41, "store": "TOP GUN", "biz": "DANYCHAN OR CHANDRAWATTIE DOODNAUTH", "account": "16176", "addr": "1871 WATSON BLVD STE A", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "LIQUOR", "nn_ft": 2585, "nn_name": "LOLO LIQUOR", "fail300": false, "fail2000": false, "parcel": "0W049A 23F000", "owner": "DANNYCHAN LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.64024912383357, 32.61792698548114, null], [-83.64017723705942, 32.61792698535287, null], [-83.64003701080394, 32.61792698541834, null], [-83.64003701098791, 32.61774403053826, null], [-83.64014727949143, 32.617744030234874, null], [-83.6402491235861, 32.617744030596654, null], [-83.64024912383357, 32.61792698548114, null]]]}}, {"type": "Feature", "properties": {"oid": 42, "store": "MINI VAPE STORE", "biz": "JAY MELDIGOGA 17 LLC", "account": "16769", "addr": "554 N DAVIS RD STE A", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "VAPE", "nn_ft": 595, "nn_name": "FAMOUS LIQUOR", "fail300": false, "fail2000": true, "parcel": "0W016E 048000", "owner": ""}, "geometry": {"type": "Polygon", "coordinates": [[[-83.61213921024618, 32.632806372093576, null], [-83.6122492590851, 32.63280727829947, null], [-83.6122484368431, 32.63287874161896, null], [-83.61213838898247, 32.632877835416096, null], [-83.61213921024618, 32.632806372093576, null]]]}}, {"type": "Feature", "properties": {"oid": 43, "store": "DELTA CIGAR", "biz": "JOEL OMONDI", "account": "17131", "addr": "150 S HOUSTON LAKE RD STE 1400", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 1433, "nn_name": "XHALE CITY", "fail300": false, "fail2000": true, "parcel": "0W0780 057000", "owner": "BARB ENTERPRISES LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.67938012334164, 32.61424734859195, null], [-83.67942856455686, 32.61431936291908, null], [-83.67924593919668, 32.61438827400569, null], [-83.67920030576303, 32.614308198412324, null], [-83.67938012334164, 32.61424734859195, null]]]}}, {"type": "Feature", "properties": {"oid": 44, "store": "SOUTHERN SIPS LIQUOR", "biz": "SWAMI BAPA 108 LLC", "account": "16947", "addr": "1129 HWY 96", "city": "KATHLEEN", "state": "GA", "zip": "31047", "type": "LIQUOR", "nn_ft": 1421, "nn_name": "THE VAPOR SHOP", "fail300": false, "fail2000": true, "parcel": "0W1030 023000", "owner": "S & D GROUP LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.69409376523659, 32.54779732359907, null], [-83.69432324132279, 32.548016799558624, null], [-83.6940370751407, 32.54823232501193, null], [-83.69380178224323, 32.54802589312535, null], [-83.69409376523659, 32.54779732359907, null]]]}}, {"type": "Feature", "properties": {"oid": 45, "store": "A-1 SMOKE SHOP", "biz": "YOGIPREM 2929 LLC", "account": "16870", "addr": "2929 WATSON BLVD STE ???", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "VAPE", "nn_ft": 1786, "nn_name": "DELTA CIGAR", "fail300": false, "fail2000": true, "parcel": "0W78D0 193000", "owner": "UMIYA 2929 LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.68473724824268, 32.61649133088587, null], [-83.6847460067085, 32.61627877829308, null], [-83.6848582134248, 32.6162820900667, null], [-83.68484945522358, 32.61649464266971, null], [-83.68473724824268, 32.61649133088587, null]]]}}, {"type": "Feature", "properties": {"oid": 46, "store": "CloudCity Vapor & E-Cig", "biz": "WHERES MY VAPE LLC", "account": "16315", "addr": "3421 HWY 41 N STE 3000 A", "city": "BYRON", "state": "GA", "zip": "31008", "type": "VAPE", "nn_ft": 149, "nn_name": "FOOD MART?", "fail300": true, "fail2000": true, "parcel": "0W78L0 043000", "owner": "BEAU CLAIRE PLAZA LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.7098151941341, 32.61857719811119, null], [-83.70981423596069, 32.61844002296469, null], [-83.71020423366465, 32.618438072744034, null], [-83.71020518603945, 32.61857524786966, null], [-83.7098151941341, 32.61857719811119, null]]]}}, {"type": "Feature", "properties": {"oid": 47, "store": "CLOUD 9 SMOKE", "biz": "CLOUD 9 SMOKE CO 43 LLC", "account": "16501", "addr": "2068 WATSON BLVD STE A", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "VAPE", "nn_ft": 1238, "nn_name": "BREATHE FIRE", "fail300": false, "fail2000": true, "parcel": "0W069A 051000", "owner": "WALNUT MANOR PROPERTIES LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.65495537041421, 32.618727881117884, null], [-83.65495537048308, 32.61876458286743, null], [-83.65495537080119, 32.618798243723965, null], [-83.65486186573969, 32.61879824417441, null], [-83.65486186531878, 32.61879719446913, null], [-83.65486186617687, 32.61865751896734, null], [-83.65486195355265, 32.618657519323385, null], [-83.65495537108691, 32.61865751941718, null], [-83.65495537041421, 32.618727881117884, null]]]}}, {"type": "Feature", "properties": {"oid": 48, "store": "MANOR MARKET PLACE", "biz": "MANOR MARKET PLACE 2024 LLC", "account": "16570", "addr": "120 MANOR CT", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "VAPE", "nn_ft": 3357, "nn_name": "ROCKY MOUNTAIN LIQUOR", "fail300": false, "fail2000": false, "parcel": "0W026C 004000", "owner": "PETERSON SUK"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.61494802670664, 32.6190415700462, null], [-83.61490655593612, 32.619064557023655, null], [-83.61483425151596, 32.61897027670757, null], [-83.61493020531324, 32.618911540797015, null], [-83.61499923804588, 32.6190131834503, null], [-83.61494802670664, 32.6190415700462, null]]]}}, {"type": "Feature", "properties": {"oid": 49, "store": "PRO SMOKE SHOP", "biz": "KKP 2024 LLC", "account": "16684", "addr": "1202 S DAVIS DR STE ???", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 2808, "nn_name": "478 VAPE & SMOKE", "fail300": false, "fail2000": false, "parcel": "0W007B 20G000", "owner": "FROEDE MANAGEMENT LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.61361951506255, 32.59992145706248, null], [-83.61370602233869, 32.59980245209413, null], [-83.61383553352209, 32.59986992896777, null], [-83.61374900722912, 32.599988924922926, null], [-83.61361951506255, 32.59992145706248, null]]]}}, {"type": "Feature", "properties": {"oid": 50, "store": "420 CAVE", "biz": "420 CAVE WR LLC", "account": "16815", "addr": "3055 WATSON BLVD STE 25", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "VAPE", "nn_ft": 612, "nn_name": "WAR-TOWN", "fail300": false, "fail2000": true, "parcel": "0W78D0 016000", "owner": "ROBINS PLAZA LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.69293427673743, 32.616104516878615, null], [-83.69287497783317, 32.61591123737338, null], [-83.69293870879075, 32.615897231880844, null], [-83.69297688910756, 32.61590766192571, null], [-83.69303485793259, 32.61608241319606, null], [-83.69293427673743, 32.616104516878615, null]]]}}, {"type": "Feature", "properties": {"oid": 51, "store": "NEXT LEVEL SMOKE SHOP", "biz": "GANESH CHATURTHI INC", "account": "16854", "addr": "4027 WATSON BLVD STE 160", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "VAPE", "nn_ft": 1801, "nn_name": "420 CAVE", "fail300": false, "fail2000": true, "parcel": "0W78D0 183000", "owner": "GALLERIA SQUARE LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.69870544198723, 32.61485101792403, null], [-83.69891750915352, 32.61481371450173, null], [-83.6989390843044, 32.61489424443911, null], [-83.69872552509995, 32.61493279585379, null], [-83.69870544198723, 32.61485101792403, null]]]}}, {"type": "Feature", "properties": {"oid": 52, "store": "???", "biz": "GNANJIVANDAS 96 LLC", "account": "17024", "addr": "946 HWY 96 STE F", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "VAPE", "nn_ft": 2279, "nn_name": "MISSION LIQUOR", "fail300": false, "fail2000": false, "parcel": "0W1030 044000", "owner": "JACK & JIM ENTERPRISE LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.68122171710874, 32.55400492093614, null], [-83.6812212341181, 32.553805058173204, null], [-83.68132667868198, 32.55380487548746, null], [-83.68132716190634, 32.55400473825221, null], [-83.68122171710874, 32.55400492093614, null]]]}}, {"type": "Feature", "properties": {"oid": 53, "store": "???", "biz": "JAY ARBUDA 320 LLC", "account": "17126", "addr": "320 CORDER RD", "city": "WARNER ROBINS", "state": "GA", "zip": "31088", "type": "LIQUOR", "nn_ft": 1540, "nn_name": "BREATHE FIRE", "fail300": false, "fail2000": true, "parcel": "0W68A0 010000", "owner": "SONABA 320 LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.65090096640787, 32.61447900213229, null], [-83.65081675523206, 32.61451969124648, null], [-83.6506819575637, 32.61432502076482, null], [-83.65076674453161, 32.614284053641896, null], [-83.65090096640787, 32.61447900213229, null]]]}}, {"type": "Feature", "properties": {"oid": 54, "store": "PUFF N STUFF", "biz": "BHOLENATH 12017 INC", "account": "17168", "addr": "12017 WATSON BLVD STE A", "city": "BYRON", "state": "GA", "zip": "31008", "type": "VAPE", "nn_ft": 8893, "nn_name": "FRIENDS & FAMILY LIQUOR", "fail300": false, "fail2000": false, "parcel": "053D 093", "owner": ""}, "geometry": {"type": "Polygon", "coordinates": [[[-83.74080936829368, 32.612917118606376, null], [-83.74073806644951, 32.612830998117296, null], [-83.74081196309058, 32.61278717078197, null], [-83.74092430519858, 32.6129301228007, null], [-83.74085444003573, 32.6129715560282, null], [-83.74084155694158, 32.61295599576312, null], [-83.74080936829368, 32.612917118606376, null]]]}}, {"type": "Feature", "properties": {"oid": 55, "store": "TOP SHELF", "biz": "DIVYA LLC", "account": "17144", "addr": "1001 ELBERTA DR STE A", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "LIQUOR", "nn_ft": 2757, "nn_name": "EXPRESS HIGHWAY STORE", "fail300": false, "fail2000": false, "parcel": "0W044D 003000", "owner": "SAMP INVESTMENT LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.63455935933148, 32.63541038384736, null], [-83.63455899520494, 32.6354105013423, null], [-83.63455910089785, 32.635410290768185, null], [-83.63455935933148, 32.63541038384736, null]], [[-83.63455935933148, 32.63541038384736, null], [-83.6346250206421, 32.635278986149345, null], [-83.63478698689273, 32.63533700903857, null], [-83.63472100557283, 32.63546848572604, null], [-83.63455935933148, 32.63541038384736, null]]]}}, {"type": "Feature", "properties": {"oid": 56, "store": "XHALE CITY", "biz": "2801 WATSON BLVD", "account": "17057", "addr": "2801 WATSON BLVD STE B", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "VAPE", "nn_ft": 1087, "nn_name": "TOBACCO & VAPE LAND 3", "fail300": false, "fail2000": true, "parcel": "0W0780 037000", "owner": "ALTIMA GROUP LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.6767779550714, 32.61794886030041, null], [-83.67671333853102, 32.617948860746786, null], [-83.67671333771092, 32.617728916843085, null], [-83.67677795408838, 32.617728917296986, null], [-83.6767779550714, 32.61794886030041, null]]]}}, {"type": "Feature", "properties": {"oid": 57, "store": "SMOKEY VAPE PLUS", "biz": "SMOKEY VAPE PLUS LLC", "account": "17057", "addr": "2195 WATSON BLVD STE P", "city": "WARNER ROBINS", "state": "GA", "zip": "31093", "type": "VAPE", "nn_ft": 1092, "nn_name": "ALL AMERICAN LIQUORS", "fail300": false, "fail2000": true, "parcel": "0W068B 036000", "owner": "WATSON CENTRAL GA LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.66067775896539, 32.615697645208776, null], [-83.6606007639645, 32.61569623749845, null], [-83.66060644282346, 32.61545746523361, null], [-83.6606838568773, 32.6154587844467, null], [-83.66067775896539, 32.615697645208776, null]]]}}, {"type": "Feature", "properties": {"oid": 58, "store": "FOOD MART?", "biz": "WARNER ROBINS LOTTO & SHOP", "account": "17206", "addr": "3421 HWY 41 STE ???", "city": "BYRON", "state": "GA", "zip": "31008", "type": "LIQUOR", "nn_ft": 149, "nn_name": "CloudCity Vapor & E-Cig", "fail300": true, "fail2000": true, "parcel": "0W78L0 043000", "owner": "BEAU CLAIRE PLAZA LLC"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.70981142156388, 32.61794049726497, null], [-83.71020141710193, 32.61793854703358, null], [-83.71020204794985, 32.61802946894981, null], [-83.70981205633477, 32.618031408373575, null], [-83.70981142156388, 32.61794049726497, null]]]}}]}, COLORS={"VAPE": "#0A84FF", "LIQUOR": "#FF9F0A"}, STATS={"total": 58, "byType": {"VAPE": 35, "LIQUOR": 23}, "avgNN": 1816, "minNN": 0, "sepCurrent": 300, "sepProposed": 2000, "fail300": 10, "fail2000": 37, "pairs300": [{"a": 19, "b": 20, "ft": 0, "aName": "ROBINS PACKAGE", "bName": "ROBINS VAPE AND SMOKE", "aType": "LIQUOR", "bType": "VAPE"}, {"a": 6, "b": 7, "ft": 23, "aName": "JUS ONE MORE SMOKE SHOP", "bName": "TOP SHELF LIQUOR", "aType": "VAPE", "bType": "LIQUOR"}, {"a": 13, "b": 14, "ft": 40, "aName": "ROCKY SMOKE SHOP", "bName": "ELECTRIC CLOUDZ", "aType": "VAPE", "bType": "VAPE"}, {"a": 46, "b": 58, "ft": 149, "aName": "CloudCity Vapor & E-Cig", "bName": "FOOD MART?", "aType": "VAPE", "bType": "LIQUOR"}, {"a": 16, "b": 27, "ft": 204, "aName": "CLASSIC BOTTLE SHOPPE", "bName": "BLAZE", "aType": "LIQUOR", "bType": "VAPE"}], "pairs2000Count": 36};
+const P=DATA.features.map(f=>f.properties);
+
+/* ---------- KPIs ---------- */
+document.getElementById('kpis').innerHTML=`
+  <div class="kpi"><b>${STATS.total}</b><span>Total locations</span></div>
+  <div class="kpi alert"><b>${STATS.fail300}</b><span>Within ${STATS.sepCurrent} ft of another (current)</span></div>
+  <div class="kpi warn"><b>${STATS.fail2000}</b><span>Within ${STATS.sepProposed.toLocaleString()} ft (proposed)</span></div>
+  <div class="kpi"><b>${STATS.minNN.toLocaleString()}</b><span>Closest pair (ft)</span></div>
+  <div class="kpi"><b>${STATS.avgNN.toLocaleString()}</b><span>Avg nearest store (ft)</span></div>`;
+
+/* type distribution bar */
+const bar=document.getElementById('typeBar'),lbl=document.getElementById('typeLbls');
+Object.entries(STATS.byType).forEach(([t,n])=>{
+  const seg=document.createElement('div');
+  seg.style.cssText=`flex:${n};background:${COLORS[t]}`;bar.appendChild(seg);
+  const l=document.createElement('span');
+  l.innerHTML=`<span class="dot" style="background:${COLORS[t]}"></span>${t} — ${n}`;
+  lbl.appendChild(l);
+});
+
+/* ---------- map ---------- */
+const map=L.map('map',{zoomControl:false});
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  {attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:20}).addTo(map);
+
+const active=new Set(Object.keys(COLORS));
+const layers={}, markers={};
+const gj=L.geoJSON(DATA,{
+  style:f=>styleFor(f.properties),
+  onEachFeature:(f,l)=>{
+    layers[f.properties.oid]=l;
+    l.bindPopup(popupHtml(f.properties));
+  }
+}).addTo(map);
+map.fitBounds(gj.getBounds().pad(0.06));
+
+/* centroid dot markers + always-on name labels (google-maps style) */
+const markerGroup=L.layerGroup().addTo(map);
+gj.eachLayer(l=>{
+  const p=l.feature.properties, c=l.getBounds().getCenter();
+  const m=L.circleMarker(c,{
+    radius:5.5,color:'#fff',weight:1.5,
+    fillColor:p.fail300?'#FF375F':(COLORS[p.type]||'#888'),fillOpacity:1
+  }).addTo(markerGroup);
+  m.bindPopup(popupHtml(p));
+  m.bindTooltip(`<div>${p.store}</div>`,
+    {permanent:true,direction:'bottom',className:'storeLbl',offset:[0,4]});
+  markers[p.oid]=m;
+});
+/* declutter: hide labels when zoomed way out */
+function labelVis(){
+  const show=map.getZoom()>=13;
+  Object.values(markers).forEach(m=>{
+    const t=m.getTooltip();
+    if(t&&t._container)
+      t._container.style.display=(show&&active.has(m._type))?'':'none';
+  });
+}
+Object.entries(markers).forEach(([oid,m])=>{
+  m._type=DATA.features.find(f=>f.properties.oid==oid).properties.type;
+});
+map.on('zoomend',labelVis);
+
+function styleFor(p){
+  const c=COLORS[p.type]||'#888';
+  return {color:p.fail300?'#FF375F':c, weight:p.fail300?3:2,
+          fillColor:c, fillOpacity:.45};
+}
+function popupHtml(p){
+  const c=COLORS[p.type]||'#888';
+  let h=`<div style="font-weight:700;font-size:14.5px">${p.store}</div>
+    <span class="tag" style="background:${c};display:inline-block;margin:4px 0">${p.type}</span>
+    <div style="font-size:12px;color:#6e6e73;line-height:1.5">${p.addr}<br>${p.city}, ${p.state} ${p.zip}</div>`;
+  if(p.biz&&p.biz!==p.store)h+=`<div style="font-size:12px;color:#6e6e73">Business: ${p.biz}</div>`;
+  if(p.account)h+=`<div style="font-size:12px;color:#6e6e73">Account: ${p.account}</div>`;
+  if(p.parcel)h+=`<div style="font-size:12px;color:#6e6e73">Parcel: ${p.parcel} · ${p.owner||''}</div>`;
+  if(p.nn_ft!=null)h+=`<div style="font-size:12px;color:#6e6e73">Nearest: ${p.nn_name} — ${p.nn_ft.toLocaleString()} ft</div>`;
+  if(p.fail300)h+=`<div style="font-size:11px;font-weight:700;color:#FF375F">&lt; ${STATS.sepCurrent} ft — fails current standard</div>`;
+  else if(p.fail2000)h+=`<div style="font-size:11px;font-weight:700;color:#FF9F0A">&lt; ${STATS.sepProposed.toLocaleString()} ft — fails proposed</div>`;
+  return h;
+}
+
+/* chips */
+const chips=document.getElementById('chips');
+Object.entries(COLORS).forEach(([t,c])=>{
+  const el=document.createElement('div');
+  el.className='chip';el.style.background=c;
+  el.innerHTML=`<span class="dot"></span>${t} ${STATS.byType[t]}`;
+  el.onclick=()=>{active.has(t)?(active.delete(t),el.classList.add('off'))
+                              :(active.add(t),el.classList.remove('off'));refresh();};
+  chips.appendChild(el);
+});
+
+/* 300 ft (current) + 2,000 ft (proposed) ring toggles */
+const RINGS={
+  current:{ft:STATS.sepCurrent, color:'#FF375F', layer:null},
+  proposed:{ft:STATS.sepProposed, color:'#FF9F0A', layer:null},
+};
+document.querySelectorAll('.ringToggle').forEach(btn=>{
+  const r=RINGS[btn.dataset.ring];
+  btn.textContent=`${r.ft.toLocaleString()} ft rings`;
+  btn.onclick=()=>{
+    if(r.layer){map.removeLayer(r.layer);r.layer=null;btn.classList.remove('on');return;}
+    r.layer=L.layerGroup();
+    gj.eachLayer(l=>{
+      if(!active.has(l.feature.properties.type))return;
+      L.circle(l.getBounds().getCenter(),{
+        radius:r.ft*0.3048,color:r.color,weight:1,
+        fillColor:r.color,fillOpacity:.05,interactive:false}).addTo(r.layer);
+    });
+    r.layer.addTo(map);btn.classList.add('on');
+  };
+});
+function clearRings(){
+  document.querySelectorAll('.ringToggle.on').forEach(b=>b.click());
+}
+
+let query='';
+document.getElementById('search').addEventListener('input',e=>{
+  query=e.target.value.toLowerCase();buildStoreTbl();});
+
+function visible(p){return active.has(p.type);}
+function refresh(){
+  gj.eachLayer(l=>{
+    const ok=visible(l.feature.properties);
+    l.setStyle(ok?styleFor(l.feature.properties):{opacity:0,fillOpacity:0});
+    if(!ok)l.closePopup();
+    if(l._path)l._path.style.pointerEvents=ok?'auto':'none';
+  });
+  Object.values(markers).forEach(m=>{
+    const ok=active.has(m._type);
+    m.setStyle({opacity:ok?1:0,fillOpacity:ok?1:0});
+    if(m._path)m._path.style.pointerEvents=ok?'auto':'none';
+    if(!ok)m.closePopup();
+  });
+  labelVis();
+  clearRings();   // stale rings on filter change
+  buildStoreTbl();
+}
+
+/* ---------- pairs table ---------- */
+(function(){
+  const tb=document.querySelector('#pairTbl tbody');
+  document.getElementById('c1').textContent=STATS.sepCurrent;
+  if(!STATS.pairs300.length){
+    tb.innerHTML=`<tr><td colspan="3" style="color:var(--sub)">No pairs within ${STATS.sepCurrent} ft.</td></tr>`;
+  }else{
+    STATS.pairs300.forEach(p=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td><span class="dot" style="background:${COLORS[p.aType]}"></span>${p.aName}</td>
+        <td><span class="dot" style="background:${COLORS[p.bType]}"></span>${p.bName}</td>
+        <td class="num"><b>${p.ft.toLocaleString()}</b></td>`;
+      tr.onclick=()=>{const l=layers[p.a];map.fitBounds(l.getBounds().pad(3));l.openPopup();
+        document.getElementById('mapCard').scrollIntoView({behavior:'smooth'});};
+      tb.appendChild(tr);
+    });
+  }
+  document.getElementById('pairNote').textContent=
+    `${STATS.pairs300.length} pair(s) under ${STATS.sepCurrent} ft · `+
+    `${STATS.pairs2000Count.toLocaleString()} pair(s) under the proposed ${STATS.sepProposed.toLocaleString()} ft.`;
+})();
+
+/* ---------- full store table ---------- */
+let sortK='store',sortAsc=true;
+document.querySelectorAll('#storeTbl th[data-k]').forEach(th=>{
+  th.onclick=()=>{const k=th.dataset.k;
+    sortAsc=(sortK===k)?!sortAsc:true;sortK=k;buildStoreTbl();};
+});
+
+function buildStoreTbl(){
+  const tb=document.querySelector('#storeTbl tbody');tb.innerHTML='';
+  let rows=P.filter(p=>visible(p));
+  if(query)rows=rows.filter(p=>
+    (p.store+' '+p.biz+' '+p.addr+' '+p.account+' '+(p.parcel||'')+' '+(p.owner||''))
+    .toLowerCase().includes(query));
+  rows.sort((a,b)=>{
+    let x=a[sortK],y=b[sortK];
+    if(typeof x==='string'){x=(x||'').toLowerCase();y=(y||'').toLowerCase();}
+    return (x>y?1:x<y?-1:0)*(sortAsc?1:-1);
+  });
+  rows.forEach(p=>{
+    const tr=document.createElement('tr');
+    const status=p.fail300?`<span class="tag r">&lt;${STATS.sepCurrent} ft</span>`
+      :p.fail2000?`<span class="tag o">&lt;${STATS.sepProposed.toLocaleString()} ft</span>`:'';
+    tr.innerHTML=`
+      <td><span class="dot" style="background:${COLORS[p.type]}"></span><b>${p.store}</b>
+        ${p.biz&&p.biz!==p.store?`<div style="color:var(--sub);font-size:11.5px">${p.biz}</div>`:''}</td>
+      <td>${p.type}</td>
+      <td>${p.addr}<div style="color:var(--sub);font-size:11.5px">${p.city}, ${p.state} ${p.zip}</div></td>
+      <td class="hideM">${p.account||''}</td>
+      <td class="hideM">${p.parcel||''}${p.owner?`<div style="color:var(--sub);font-size:11.5px">${p.owner}</div>`:''}</td>
+      <td class="num">${p.nn_ft!=null?p.nn_ft.toLocaleString():''}</td>
+      <td>${status}</td>`;
+    tr.onclick=()=>{const l=layers[p.oid];map.fitBounds(l.getBounds().pad(3));
+      l.openPopup();document.getElementById('mapCard').scrollIntoView({behavior:'smooth'});};
+    tb.appendChild(tr);
+  });
+}
+
+refresh();
+</script>
+</body>
+</html>
